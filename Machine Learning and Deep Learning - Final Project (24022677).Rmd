@@ -1,0 +1,993 @@
+---
+title: "MAST6100: Machine Learning and Deep Learning - Final Project (wl259)"
+author: "Sarah Lee"
+date: "2025-11-26"
+output: word_document
+---
+
+Version of R in use: R 4.5.2
+
+Version of RStudio in use: 2025.09.2+418
+
+To ensure this Rmarkdown file to run properly and avoid errors from outdated versions, please use the same version of R and RStudio.
+
+## Appendix 1: Installing Packages and Loading Data into R
+### Appendix 1.1: Set Working Directory
+Setting the working directory enables R where to retrieve the data file from, so that we can load the data set for analysis.
+
+Set working directory of where the data file is located by: 'Session' --> 'Set Working Directory' --> 'Choose Directory' --> choose the file of where the data file is located OR use the code below by inserting the file's location and removing the # to run the code.
+```{r Set Working Directory}
+# setwd("insert_file_location_here")
+```
+
+
+### Appendix 1.2: Installing Necessary Packages
+Before we start, we need to install the packages used in each section to use the functions we need for analysis. Later on in each section, we will load the packages used for the section.
+
+Note: Some packages are used in different sections as well, but a package only needs to be installed once.
+
+```{r Install Packages}
+# Data Cleaning and Quality Checking
+install.packages("tidyverse", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("dlookr", dependencies = TRUE, repos = "http://cran.rstudio.com")
+
+# Exploratory Data Analysis (EDA)
+install.packages("dplyr", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("ggplot2", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("tidyr", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("scales", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("janitor", dependencies = TRUE, repos = "http://cran.rstudio.com")
+
+# Variable Selection and Regression
+install.packages("MASS", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("glmnet", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("Matrix", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("nnet", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("caret", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("hnp", dependencies = TRUE, repos = "http://cran.rstudio.com")
+
+# Classification
+install.packages("e1071", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("ranfomForest", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("class", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("kernlab", dependencies = TRUE, repos = "http://cran.rstudio.com")
+
+# Deep Learning
+install.packages("keras3", dependencies = TRUE, repos = "http://cran.rstudio.com")
+install.packages("tensorflow", dependencies = TRUE, repos = "http://cran.rstudio.com")
+```
+
+### Appendix 1.3: Loading Data into R
+Load the data file into RStudio using the code below and look at the beginning of the data to see some features of the data. (E.g.: what are the variable names in the file, the types of data)
+
+```{r Loading Data into R}
+# To load the data into R for a csv file first remove #, then insert file name:
+# raw_data <- read.csv("insert_name_of_your_data.csv")
+raw_data <- read.csv("healthcare_dataset.csv") # Name the loaded data as "raw data" as the data has not been checked
+
+head(raw_data) # To show beginning of data
+```
+
+
+## Appendix 2: Data Cleaning and Quality Checking
+### Appendix 2.1: Loading Necessary Packages
+```{r Loading Necessary Packages: Data Clenaing and Quality Checking}
+library(tidyverse) # For data manipulation, visualization and analysis
+library(dlookr)    # This allows us to create a table with the number of missing values and gives us other insights
+```
+
+### Appendix 2.2: Quick Data Diagnosis
+In this section, we will do a preliminary check on the data to see what might need to be done in data cleaning and quality checking.
+
+```{r Quick Data Diagnosis}
+str(raw_data) # Checking the structure of data frame
+dim(raw_data) # Checking the dimensions of the data
+
+diagnosis <- diagnose(raw_data) # This creates a table of variable names, the type of data, number of missing values and unique values, along with the rate of unique values
+diagnosis # This allows us to see the whole diagnosis.
+```
+
+### Appendix 2.3: Check For Missing Values
+There may be certain values in the data that are not recognised as missing values, so we will first replace all these possible values. Then, we can see the true missing data count to determine if the data needs to be cleaned for missing values.
+
+```{r Check For Missing Values}
+raw_data[raw_data == "NA"] <- NA
+# If there are any values that says NA but recognises it as text, it might cause the missing count to be 0, so this fixes this issue
+raw_data[raw_data == "[]"] <- NA
+# If there are any values that says [] but recognises it as text, it might cause the missing count to be 0, so this fixes this issue
+raw_data[raw_data == ""] <- NA
+# If there are any values that says empty cells but recognises it as text, it might cause the missing count to be 0, so this fixes this issue
+
+# Now we can see the true missing data count in diagnose again
+diagnosis <- diagnose(raw_data)
+diagnosis
+
+# We can see that there are no missing observations in any of the data. To confirm this, we can use another line of code as below:
+sum(is.na(raw_data)) # Shows total number of missing observations, which is 0 and confirms our diagnosis above
+```
+
+### Appendix 2.4: Correcting Letters
+We can see from the beginning of data that the patient names do not have consistent letters. So, to make data cleaning more accurate, we will make all the letters in the name into small letters.
+
+```{r Correcting Letters}
+# Changing patient names to all small letters 
+raw_data$Name <- tolower(raw_data$Name)
+```
+
+
+### Appendix 2.5: Check For Duplicates
+Check if all data in the dataset is unique and there are no repeats.
+
+If all data taken is unique, then the patients' names should be all unique and match the number of rows. So, we will check for the names of all the patients and ensure there are no repeats.
+
+```{r Check For Duplicates}
+# Step 1: Check if all patient names are unique
+# If all patient names are unique, then the number of unique rows should match with the number of rows of the data
+if(n_distinct(raw_data$Name) == nrow(raw_data)) {
+  print(paste("No duplicates in patient names"))
+} else {
+  num_duplicates <- nrow(raw_data)-n_distinct(raw_data$Name)
+  print(paste("Number of potential duplicates in patient names:", num_duplicates))
+}
+
+# Output shows that there is a duplicate patient names, so we are going to identify it using the duplicated function with a condition to show the first duplicate line. Then, we match the admission data and discharge date of the patients with the same name to identify the difference between these duplicated names.
+
+duplicated_rows1 <- raw_data %>%
+  filter(
+    duplicated(across(c(Name))) |
+      duplicated(across(c(Name,)), fromLast = TRUE)
+  ) %>%
+  arrange(Name)
+
+print(head(duplicated_rows1))
+
+# Here, we can see that most of the duplicated names, but it is hard to tell which to remove
+# So, we will filter it again to look for the patients that have the exact same details for all their columns. This is to enable us to know which of them are definitely duplicates that need to be removed
+exact_duplicates <- raw_data %>%
+  group_by(across(everything())) %>%
+  filter(n() > 1) %>%
+  ungroup() %>%
+  arrange(Name)
+
+print(head(exact_duplicates))
+# Here, we can see that there are 1068/2=534 pairs of duplicated names with the eaxct same details, so we will remove one of each
+
+raw_data <- raw_data %>%
+  distinct()
+# To check if this was successful, we will run the exact_duplicates again. If it prints to have no rows, we will know that this is successful
+
+exact_duplicates <- raw_data %>%
+  group_by(across(everything())) %>%
+  filter(n() > 1) %>%
+  ungroup() %>%
+  arrange(Name)
+
+print(head(exact_duplicates))
+# There are no rows printed, so the removal was successful
+
+# Now, we will check if the patients with the same name have any different details on each column
+other_cols <- setdiff(names(raw_data), "Name") # Get all columns except Name
+
+name_duplicates <- raw_data %>%
+  group_by(Name) %>%
+  # Check if any other column varies within the same Name
+  filter(if_any(all_of(other_cols), ~ n_distinct(.) > 1)) %>%
+  ungroup() %>%
+  arrange(Name)
+
+print(head(name_duplicates))
+
+# From what we can observe, most of the patients with the same name have almost the same details except for their age. But since we cannot tell what is the real age of the patient, we will assume the first entry of the person in the data is correct as there are no missing data for each column.
+raw_data <- raw_data %>%
+  distinct(Name, .keep_all = TRUE)
+
+# Now, we check again if there are any duplicated names to see if the removal was successful
+if(n_distinct(raw_data$Name) == nrow(raw_data)) {
+  print(paste("No duplicates in patient names"))
+} else {
+  num_duplicates <- nrow(raw_data)-n_distinct(raw_data$Name)
+  print(paste("Number of potential duplicates in patient names:", num_duplicates))
+}
+# There are no duplicates in patient names, so the removal was successful
+```
+
+### Appendix 2.6: Checking For Negative Values
+We can see that all the numeric and integer columns should not have any negative scores, so we need to make sure that is true. The numeric and integer columns are age, billing amount and room number.
+
+```{r Checking For Negative Values In Numeric And Integer Columns}
+# The function below selects the chosen numeric and integer values that we can observe from the diagnose table above and gives us a summary of how many negative values are in each of the chosen columns
+
+# Choose the numeric and integer columns
+num_cols <- c("Age", "Billing.Amount", "Room.Number")
+
+# Filter to see if there are any negative values
+negative_values <- raw_data %>%
+  filter(if_any(all_of(num_cols), ~ . < 0))
+
+# Print to see all of them
+print(negative_values)
+# The output shows that there are negative values, so there we will remove them
+
+raw_data <- raw_data %>%
+  filter(if_all(all_of(num_cols), ~ . >= 0))
+
+# Run negative values again to check if removal was successful
+negative_values <- raw_data %>%
+  filter(if_any(all_of(num_cols), ~ . < 0))
+
+print(negative_values)
+# Since there are no rows printed, the removal was successful and there are no more negative values where there should not be.
+```
+
+### Appendix 2.7: Check The Type Of The Data
+```{r Check The Type Of The Data}
+diagnosis <- diagnose(raw_data)
+diagnosis
+# From here, we can tell that there are types of data that need to be changed, so we assign the correct types to each variables
+
+raw_data$Gender <- as.factor(raw_data$Gender)
+raw_data$Blood.Type <- as.factor(raw_data$Blood.Type)
+raw_data$Medical.Condition <- as.factor(raw_data$Medical.Condition)
+raw_data$Date.of.Admission <- as.Date(raw_data$Date.of.Admission)
+raw_data$Doctor <- as.factor(raw_data$Doctor)
+raw_data$Hospital <- as.factor(raw_data$Hospital)
+raw_data$Insurance.Provider <- as.factor(raw_data$Insurance.Provider)
+raw_data$Admission.Type <- as.factor(raw_data$Admission.Type)
+raw_data$Discharge.Date <- as.Date(raw_data$Discharge.Date)
+raw_data$Medication <- as.factor(raw_data$Medication)
+raw_data$Test.Results <- as.factor(raw_data$Test.Results)
+
+diagnosis <- diagnose(raw_data)
+diagnosis
+```
+
+### Appendix 2.8: Removing Unneccessary Columns
+There are some columns that were only used to clean the data, but are not relevant to the analysis, so we will remove them.
+
+Here, we will remove the "Name", "Doctor", "Date of Admission", "Hospital" and "Discharge Date" columns as they were only used to identify duplicates, but will not affect analysis at all. 
+```{r Removing Unneccessary Columns}
+# Removing "Name", "Doctor", "Date of Admission", "Hospital" and "Discharge Date" columns
+raw_data <- raw_data[,-c(1,6:8,13)]
+
+# Run diagnosis to see if "Name" column has been removed
+diagnosis <- diagnose(raw_data)
+diagnosis
+```
+
+### Appendix 2.9: Renaming Checked And Cleaned Data Set
+Hence, we can rename "raw_data" as "health"
+
+```{r Renaming Checked And Cleaned Data Set}
+health <- raw_data # Rename the "raw_data" to "health"
+
+# Use diagnosis() function to check whether renaming is successful. If renaming is successful, it will show the same diagnosis table from above
+diagnosis <- diagnose(health)
+diagnosis
+```
+
+## Appendix 3: Exploratory Data Analysis (EDA)
+### Appendix 3.1: Loading Necassary Packages
+```{r Loading Necassary Packages: EDA}
+library(dplyr)   # For data manipulation
+library(tidyr)   # To tidy data
+library(ggplot2) # Load package ggplot2 for function ggplot to make plots
+library(scales)  # This package allows us to transform any scientific notation on axes to be displayed as normal numbers
+library(janitor) # To get the proportion of each discrete variable
+```
+
+
+### Appendix 3.2: Basic Statistics and Key Points Of Data
+Using the summary function, we can better understand the key points and basic statistics in each variable before going into further analysis.
+
+#### Appendix 3.2.1: Basic Summary
+```{r Basic Summary}
+summary(health) # Shows the type and general key characteristics of each variable, though it is only more useful for the continuous distributions as it can show the key points in the continuous data
+```
+Analysis:
+- Age: Has a range from 18 to 85 with an average of 51.7 years old
+- Billing amount: Has a range of 9.24 to 52764.28 with similar mean and meadian
+- Room number: Has a range from 101 to 500
+
+#### Appendix 3.2.2: Discrete Data
+We use the tabyl() function to create frequency tables (counts and proportions) of each variable in a data frame. This is for use to get an idea of how the discrete data is structured.
+
+```{r Discrete Data}
+# First, we look for which column is a factor column. This will tell us which variables are discrete
+sapply(health, is.factor)
+
+# Then, we can use the tabyl() function to create the frequency tables
+tabyl(health$Gender)
+tabyl(health$Blood.Type)
+tabyl(health$Medical.Condition)
+tabyl(health$Insurance.Provider)
+tabyl(health$Admission.Type)
+tabyl(health$Medication)
+tabyl(health$Test.Results)
+```
+Analysis: Overall, looks to be quite evenly spread out for all variables. This can be confirmed later on with pie charts and box plots
+
+#### Appendix 3.2.3: Correlation
+Further, we check for correlation among numeric predictors.
+```{r Correlation}
+cor(health[, sapply(health, is.numeric)], use = "complete.obs")
+```
+From what we can see there isn't any significant correlation between any of the numeric variable as none of the correlation coefficients other than the diagonal (which is the correlation the variable itself) is more than 0.5.
+
+Hence, when doing the variable selection in later sections, we will not use any interactions between the variables.
+
+
+### Appendix 3.3: EDA - Boxplots For Outliers
+By plotting boxplots for the continuously distributed variables, we can see if there are any outliers present in the variable. Then, we will carry out further analysis to determine whether the outliers need to be removed from the variable to prevent it from affecting the further analysis and predictions.
+```{r Boxplots}
+# Loop to make boxplot for each variable
+for(var in colnames(health)) {
+  # Choose only numeric variables to look at the outliers as an overview
+  if(is.numeric(health[[var]])) {
+    # If column is numeric, then create boxplot
+    var_box <- boxplot(health[[var]], main=paste("Boxplot of" , var), ylab="Values") + theme_minimal()
+    var_box # Show the boxplot created
+  } else {
+    # If column is not numeric, then says its not applicable
+    print(paste("Boxplot is not applicable for", var))
+  }
+}
+```
+Analysis: Results show that there are no outliers. Hence, there is no need to check whether any outliers need to be removed.
+
+
+### Appendix 3.4: EDA - Histogram
+We plot histograms for continuous numeric variables to get an idea of how the variable is distributed.
+
+```{r Histogram}
+for (var in colnames(health)){
+  # Check if the variable is numeric
+  if (is.numeric(health[[var]])){
+  # Create histogram for each numeric variable
+  hist(health[[var]], main = paste("Histogram of", var), xlab = var, col = "skyblue", border = "white")
+} else {
+    # If column is not numeric, then says its not applicable
+    print(paste("Histogram is not applicable for", var))
+  }    
+}
+```
+Analysis:
+- Age: Looks to be negatively skewed
+- Billing amount: Looks to be positively skewed
+- Room number: Has the form of a uniform distribution
+
+### Appendix 3.5: EDA - Pie Charts For All Variables
+We use pie charts to see the percentage of each category in the variable to better understand how the data of each variable is proportioned.
+
+#### Appendix 3.5.1: Creating Function For Making Pie Charts
+Here, we are going to create a unique function to quickly make pie charts. Then, we will loop our unique functions in Section 3.5.2 to each of the variables so that it will create the pie charts easily.
+```{r Creating unique function to make pie charts}
+pie_chart <- function(data, var) {
+  # Select the variable form the dataset
+  selected_var <- data[[var]]
+  
+  # If NA exists, convert it to be an "Unknown" so that it can be classed as a category as well
+  selected_var[is.na(selected_var)] <- "Unknown"
+  
+  # Count the number/frequency
+  count <- table(selected_var)
+  
+  # Calculate percentages to 1 decimal place
+  percentages <- round(100*count/sum(count), 1)
+  
+  # Adjust the plot margins for the pie chart
+  par(mar=c(1,3,3,1))
+  
+  # Create the pie chart
+  draw_chart <- pie(count, 
+                   col=rainbow(length(count)), # Auto-assign colours to each of the proportions
+                   main=paste("Pie Chart for", var), # Name of pie chart
+                   labels=paste(percentages, "%"), # Show it as percentage
+                   radius=0.85,
+                   cex=1.1, # Adjust the size of the chart
+                   xpd=TRUE) # Allows legend to be drawn outside the plot region
+  
+  # Add legend to see what colour means
+  legend("topleft",
+         legend=names(count),
+         fill=rainbow(length(count)),
+         title="Categories",
+         cex=0.9, # Adjust the size of the text
+         xpd=TRUE)
+}
+```
+
+#### Appendix 3.5.2: Making Pie Charts
+```{r Loop to make pie charts}
+# Here, we ignore "Doctor" and "Hospital" column as ther have too many factor levels
+for (var in colnames(health)) {
+    if (is.factor(health[[var]])) {
+        pie_chart(health, var)
+    } else {
+    # If column is not a factor, then says its not applicable
+    print(paste("Pie chart is not applicable for", var))
+    }
+}
+```
+Analysis:
+- Gender: Split evenly between male and female
+- Blood type, medical condition, insurance provider, admission type, medication, test results: Almost split evenly in its own variables
+
+### Appendix 3.6: EDA - Bar Charts For All Variables
+We use bar charts to see the count of each category in the variable to better understand how the data of each variable is spread.
+
+#### Appendix 3.6.1: Creating Function For Making Bar Chart
+Here, we are going to create a unique function to quickly make the bar charts. Then, we will loop our unique functions in Section 3.6.2 to each of the variables so that it will create the bar charts easily.
+```{r Creating unique function to make bar charts}
+bar_chart <- function(data, var) {
+  # Select the variable form the dataset
+  selected_var <- data[[var]]
+  
+  # If NA exists, convert it to be an "Unknown" so that it can be classed as a category as well
+  selected_var[is.na(selected_var)] <- "Unknown"
+  
+  # Count the number/frequency
+  count <- as.data.frame(table(selected_var))
+  
+  # Rename the columns for ggplot2 compatibility
+  colnames(count) <- c("category", "count")
+  
+  # Create bar chart
+  bar <- ggplot(count, aes(x = category, y = count, fill = category)) +
+    geom_bar(stat = "identity") +  # Use actual counts
+    geom_text(aes(label = count), vjust = -0.5, size = 4) +  # Add count labels above bars
+    labs(title = paste("Bar Chart -", var), x = "Categories", y = "Frequency") +  # Labels
+    scale_fill_manual(values = rainbow(length(count$category))) +  # Manual color palette
+    theme_minimal() +  # Clean theme
+    theme(axis.text.x=element_text(angle = 45, hjust = 1)) + # Rotate x-axis labels by 45 degrees
+    theme(plot.title=element_text(size=14, face="bold"),  # Adjust plot title size,
+          axis.text.x = element_text(size = 11),    # Adjust x-axis label size,
+          legend.position="none")
+  
+  # Print the bar chart
+  print(bar)
+}
+```
+
+#### Appendix 3.6.2: Making Bar Charts
+```{r Loop to make bar charts}
+# Here, we there have too many factor levels
+for (var in colnames(health)) {
+    if (is.factor(health[[var]])) {
+        bar_chart(health, var)
+    } else {
+    # If column is not a factor, then says its not applicable
+    print(paste("Bar chart is not applicable for", var))
+    }
+}
+```
+Analysis:
+- Verifies pie chart analysis as the output shows similar results
+
+## Appendix 4: Variable Selection And Regression
+As we can see from the EDA above the response variable (the outcome), admission type, is categorical data. Therefore, since the response variable only has 3 outcomes even though it has multiple independent variables (a factor that can cause changes in the response variable), so we are going to use mutliclass logistic regression.
+
+### Appendix 4.1: Loading Necessary Packages
+```{r Loading Necessary Packages: Variable Selection And Regression}
+library(MASS)   # Used for advanced statistical modelling and variable selection
+library(glmnet) # Used to fit the model
+library(Matrix) # For building Matrices
+library(nnet)   # Used to fit the model
+library(caret)  # Used for cross-validation, classification, building, tuning, and evaluating the model
+library(hnp)    # Used to test for goodness of fit after variable selection
+```
+
+### Appendix 4.2: Variable Selection
+#### Appendix 4.2.1: Designing The Data For Model Fitting
+```{r Designing The Data For Model Fitting}
+# First, we make the predictors into a matrix and outcome as the factor outcome for admission type
+x <- model.matrix(Admission.Type ~ ., data = health)[, -1]
+y <- health$Admission.Type 
+```
+
+#### Appendix 4.2.2: Select Coefficients
+```{r Select Coefficients}
+## Pure LASSO
+fit_lasso <- cv.glmnet(
+  x, y,
+  family = "multinomial",
+  alpha = 1 # LASSO
+  )
+
+# Best shrinkage parameter
+fit_lasso$lambda.min
+
+# Selected coefficients
+coef(fit_lasso, s = "lambda.min")
+# Given that there are only values in the intercept, none of the variables were selected in this case
+# But, since LASSO is quite an aggressive form of variable selection, we can try to use more ridge by reducing the alpha
+
+## A Balanced Elastic Net
+fit_lasso <- cv.glmnet(
+  x, y,
+  family = "multinomial",
+  alpha = 0.5
+  )
+
+# Best shrinkage parameter
+fit_lasso$lambda.min
+
+# Selected coefficients
+coef(fit_lasso, s = "lambda.min")
+
+## We can see that there are selected variables now, but they are weak. So, we will not consider them when doing the predictions
+## However, we can still use it for further interpretation later on. Hence, we will get the names of the selected variables for later
+
+# Get exact names of the variables selected
+selected_vars <- unique(unlist(lapply(
+  coef(fit_lasso, s = "lambda.min"),
+  function(m) rownames(m)[as.numeric(m) != 0]
+)))
+selected_vars <- setdiff(selected_vars, "(Intercept)")
+selected_vars
+```
+
+### Appendix 4.3: Prediction
+#### Appendix 4.3.1: Splitting The Data
+```{r Splitting The Data}
+set.seed(100)# For reproducibility
+
+# Randomly select 80% of the row as the split
+split <- sample(1:nrow(health), 0.8 * nrow(health)) 
+train_data <- health[split, ]  # Use the 80% selected for training
+test_data <- health[-split, ]  # Use the remaining for testing
+
+# Build matrices for training data
+x_train <- sparse.model.matrix(Admission.Type ~ ., data = train_data)[,-1]
+y_train <- train_data$Admission.Type
+
+# Build matrices for test data
+x_test <- sparse.model.matrix(Admission.Type ~ ., data = test_data)[,-1]
+y_test <- test_data$Admission.Type
+```
+
+#### Appendix 4.3.2: Fit the LASSO On Training Data And Test Data
+```{r Fit the LASSO On Training Data And Test Data}
+## Training Data
+fit_lasso_train <- cv.glmnet(
+  x_train, y_train,
+  family = "multinomial",
+  alpha = 1
+)
+
+## Test Data
+fit_lasso_test <- cv.glmnet(
+  x_test, y_test,
+  family = "multi",
+  alpha = 1
+)
+
+# Plotting cross-validation curve
+plot(fit_lasso_train)
+```
+Analysis: 
+- Shows that the lambda.min (best fit model) and the lambda.1se (simpler model) will give similar outcomes. 
+- So, we will just use the best fit model (which uses all the independent variables) going forward when we do predictions, seeing that there are not much benefits using a simpler model
+- However, we can still use the variable selection to see what other/further effects it might give to the model
+
+#### Appendix 4.3.3: Making Predictions Using The Full Model
+```{r Making Predictions Using The Full Model}
+## Training data
+pred_probs_train <- predict(fit_lasso_train, newx = x_train, s = "lambda.min", type = "response")
+
+## Test Data
+pred_probs_test <- predict(fit_lasso_test, newx = x_test, s = "lambda.min", type = "response")
+```
+
+#### Appendix 4.3.4: Prediction Accuracy
+```{r Prediction Accuracy}
+pred <- predict(fit_lasso_train, newx = x_test, s = "lambda.min", type = "class")
+mean(pred == y_test)
+```
+Analysis: Model is about 34% accurate, which is low. Though this was expected as all the variables were fairly evenly spread out, so we already expected that the predictions may not be very accurate
+
+### Appendix 4.4: Variable Selection Interpretation
+#### Appendix 4.4.1: Summary of Variable Selection Fit
+```{r Interpretation After Prediction}
+# Refit the model with the selected variables
+fit_refit <- multinom(
+  Admission.Type ~ Age + 
+                   Blood.Type + 
+                   Medical.Condition +
+                   Gender + 
+                   Insurance.Provider + 
+                   Medication,
+  data = health
+)
+
+summary(fit_refit) # To see key outcomes of the model
+```
+Analysis:
+- Age: Looks that older patient are slightly more likely to have Emergency or Urgent admissions
+- Blood types: Admission types do vary by blood groups
+- Medical condition: Asthma patients are more likely to have more emergency or Urgent admissions. Diabetic patients do have more urgent admissions, though less for emergency admissions
+- Gender: Males shows to have slightly more likely urgent admissions compared to females
+- Insurance providers: Blue cross, cigna, medicare and United healthcare generally have higher number of emergency or urgent admitted patients with signa and medicare having stronger positive chance for urgent admissions
+- Medication: Lipitor shows some increasing effects on emergency and urgent admissions with Ibuprofen and Penicillin also having slightly lesser increasing effect on emergency and urgent admissions, but Paracetamol shows slight decreasing effect on urgent admissions
+
+#### Appendix 4.4.2: Odds Ratios And Standard Errors
+To see the extent of the effects of the variables and how statistically significant are the variables
+```{r Odd Ratios And Standard Errors}
+# Using the fit_refit we got just now, we get the log-odds coefficients to find the odds ratios
+# Log-odds ratio
+coefs <- coef(fit_refit) 
+
+# Compute odds ratios
+O.R. <- exp(coefs)
+
+# Standard errors
+s.e.s <- summary(fit_refit)$standard.errors
+```
+
+#### Appendix 4.4.3: Confidence Intervals (95%)
+```{r Confidence Intervals}
+lower_CI <- exp(coefs - 1.96 * s.e.s)
+upper_CI <- exp(coefs + 1.96 * s.e.s)
+```
+
+#### Appendix 4.4.4: Combine Into A Table
+```{r Combine Into A Table For Ease of Analysis}
+results <- as.data.frame(coefs) %>%
+  mutate(Outcome = rownames(coefs)) %>%
+  pivot_longer(-Outcome, names_to = "Variable", values_to = "Estimate") %>%
+  mutate(
+    OR = exp(Estimate),
+    SE = as.vector(s.e.s),
+    CI_lower = exp(Estimate - 1.96 * SE),
+    CI_upper = exp(Estimate + 1.96 * SE)
+  )
+
+# Show the whole table
+results
+```
+Analysis:
+- Most predictors (independent variabels) shows small or little effects on admission types
+- Blood type generally has weak and inconsistent effects
+- Insurance provider, being male, obese, diabetic does show some mild positive effect on emergency or urgent admissions compared to elective admissions.
+
+#### Appendix 4.4.5: Goodness of Fit
+```{r Goodness of Fit}
+# Make custom pearson residuals function
+pearson_resid <- function(fit) {
+  p <- fitted(fit) # Predicted probabilities
+  y <- model.matrix(~ Admission.Type - 1, data = fit$model)
+  
+  res <- (y - p) / sqrt(p * (1 - p)) # Formula for residuals
+  apply(res, 1, max) # Apply the maximum residual per observation
+}
+
+# Run HNP using the custom pearson residuals function and the refitted model with the selected variables
+hnp(fit_refit, resid.fun = pearson_resid, nsim = 99)
+```
+Analysis: 
+- Given that this is fitted using a multinomial logistic regression model, the vertical line in the output is expected as the response variable is categorical and the residuals can only take a few values
+- Though with the smooth curve, it can be seen that the largest residuals are slightly outside the envelope which indicates there are missing predictors
+- This indicates that the fitted model after variable selection is a moderate-to-poor fit, which justifies the previous decision of using all the variables for the model instead of the model after variable selection
+
+### Appendix 4.5: Cross-Validation
+#### Appendix 4.5.1: K-Fold Cross Validation
+```{r K-Fold Cross-Validation}
+set.seed(100) # For reproducibility
+
+## 5-fold cross-validation
+# Define cross-validation settings
+cv_control_5 <-trainControl(
+  method = "cv",
+  number = 5,
+)
+
+# Train multinomial logistic regression with CV
+model_cv5 <- train(
+  Admission.Type ~ .,
+  data = health,
+  method = "multinom",   # Tells that its a multinomial logistic regression
+  trControl = cv_control_5,
+  trace = FALSE
+)
+
+# Print CV results
+print(model_cv5)
+
+# Access resampling results, e.g., accuracy
+model_cv5$resample$Accuracy
+mean(model_cv5$resample$Accuracy)
+
+## Next, we try 10-fold cross-validation to see if there are any improvements
+set.seed(100) # For reproducibility
+
+## 10-fold cross-validation
+# Define cross-validation settings
+cv_control_10 <-trainControl(
+  method = "cv",
+  number = 10,
+)
+
+# Train multinomial logistic regression with CV
+model_cv10 <- train(
+  Admission.Type ~ .,
+  data = health,
+  method = "multinom",   # Tells that its a multinomial logistic regression
+  trControl = cv_control_10,
+  trace = FALSE
+)
+
+# Print CV results
+print(model_cv10)
+
+# Access resampling results, e.g., accuracy
+model_cv10$resample$Accuracy
+mean(model_cv10$resample$Accuracy)
+```
+Analysis 5-fold CV:
+- Average accuracy is about 33.5% which is very low
+- Kappa is negative, so the model is no better than pure guessing using 5-fold CV
+- Shows that model has very weak predictive power
+
+Analysis 10-fold CV:
+- Average accuracy is about 33.8% which is only slightly better than 5-fold CV
+- Kappa is positive now, but (~0.004) still less than 0.05, so model is not much better than pure guessing
+- Still shows that model has very weak predictive power
+
+#### Appendix 4.5.2: Confusion Matrix
+```{r Confusion Matrix}
+confusionMatrix(factor(pred, levels = levels(y_test)), y_test)
+```
+Analysis:
+- About 33.7% is correct, which is what we have expected from the previous results
+- Kappa is 0.0045, which confirms the k-fold cross-validation
+- Though we can note here, that the model completely fails to predict emergency cases, but the model still performs at chance level for every class of admission type
+- Results indicate that the available predictors are not suitable or insufficient to distinguish admission types, particularly emergency admissions
+
+## Appendix 5: Classification
+### Appendix 5.1: Loading Necessary Packages
+```{r Loading Necessary Packages: Classification}
+library(e1071)        # For data mining and classification
+library(randomForest) # For random forests
+library(class)        # For KNN
+library(kernlab)      # To back-end for SVM (Radial)
+```
+
+### Appendix 5.2: Resplit The Data
+```{r Resplit The Data}
+set.seed(100)# For reproducibility
+
+# Randomly select 80% of the row as the split
+split <- sample(1:nrow(health), 0.8 * nrow(health)) 
+train_data <- health[split, ]  # Use the 80% selected for training
+test_data <- health[-split, ]  # Use the remaining for testing
+```
+
+### Appendix 5.3: Reprocessing And Train Control
+```{r Reprocessing And Train Control}
+# Set the instructions on how to train and evaluate the model
+train_control <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,  
+  summaryFunction = multiClassSummary # Multiclass performance matrix
+)
+```
+
+### Appendix 5.4: Random Forest
+#### Appendix 5.4.1: Random Forest Model
+```{r Random Forest Model}
+# Train the model
+rf_model <- train(
+  Admission.Type ~ .,
+  data = train_data, # Use the training data set
+  method = "ranger", # Fits an efficient RF, supports large datasets and multiclass problems efficiently
+  trControl = train_control, # Applies the previously set instructions
+  tuneLength = 5 # Automatically tries different mtry values and selects the best one
+)
+```
+
+#### Appendix 5.4.2: Predictions and Evaluation
+```{r Random Forest: Predictions and Evaluations}
+rf_pred <- predict(rf_model, newdata = test_data) # Predict
+rf_acc <- mean(rf_pred == test_data$Admission.Type) # Accuracy
+rf_cm <- confusionMatrix(rf_pred, test_data$Admission.Type) # Overall model evaluation
+
+print("Random Forest Accuracy:")
+print(rf_acc)
+print("Random Forest Confusion Matrix:")
+print(rf_cm)
+```
+Analysis:
+- Accuracy is still about 33.1%, which is almost the same as the regression model, no improvements
+- Though random forest does predict all 3 classes of admission types (unlike the multinomial model), but the predictions are almost uniformly spread
+- Kappa is negative here, which indicates that its worse than random guessing an ocnfirms that the predictions are essentially random
+
+### Appendix 5.5: K-Nearest Neighbors (KNN)
+#### Appendix 5.5.1: KNN Model
+```{r KNN Model}
+knn_model <- train(
+  Admission.Type ~ .,
+  data = train_data, # Use training data
+  method = "knn", # Use K-Nearest Neighbors classification
+  preProcess = c("center", "scale"), # Standardise predictors
+  trControl = train_control,# Applies the previously set instructions
+  tuneLength = 10 # Automatically tries multiple k values and select the best one
+)
+```
+
+#### Appendix 5.5.2: Predictions and Evaluation
+```{r KNN: Predictions and Evaluation}
+knn_pred <- predict(knn_model, newdata = test_data) # Predict
+knn_acc <- mean(knn_pred == test_data$Admission.Type) # Accuracy
+knn_cm <- confusionMatrix(knn_pred, test_data$Admission.Type) # Overall model evaluation
+
+print("k-NN Accuracy:")
+print(knn_acc)
+print("k-NN Confusion Matrix:")
+print(knn_cm)
+```
+Analysis:
+- Accuracy is about 32.9%, which is no better than random forests
+- Again, most predictions are almost evenly spread across all admission types
+- Again, kappa is negative, so model is no better than random guessing
+
+### Appendix 5.6: Linear Discriminant Analysis (LDA)
+#### Appendix 5.6.1: LDA Model
+```{r LDA Model}
+lda_model <- train(
+  Admission.Type ~ .,
+  data = train_data, # Use training data
+  method = "lda", # Use LDA classification
+  trControl = train_control # Applies the previously set instructions
+)
+```
+
+#### Appendix 5.6.4: Predictions And Evaluation
+```{r SVM: Predictions And Evaluation}
+lda_pred <- predict(lda_model, newdata = test_data) # Predict
+lda_acc <- mean(lda_pred == test_data$Admission.Type) # Accuracy
+lda_cm <- confusionMatrix(lda_pred, test_data$Admission.Type) # Overall model evaluation
+
+print("LDA Accuracy:")
+print(lda_acc)
+print("LDA Confusion Matrix:")
+print(lda_cm)
+```
+Analysis:
+- Accuracy is about 33.6%, similar to previous results
+- Again, most predictions are almost evenly spread across all admission types
+- Kappa is positive here, but (0.0003) still less than 0.05, effectively no better than random guessing
+
+- Overall, every model gives a chance performance, so the problem is not the model choice.
+- It may be that the predictors do not contain much usable information to distinguish admission types
+
+## Appendix 6: Deep Learning
+### Appendix 6.1: Loading Necessary Packages
+```{r Loading Necessary Packages: Deeping Learning}
+library(keras3) # Used for deep learning
+library(tensorflow) # Allows to run custom deep-learning computations
+```
+
+### Appendix 6.1: Resplit The Data
+```{r Deep Learning: Resplit The Data}
+set.seed(100)# For reproducibility
+
+# Randomly select 80% of the row as the split
+split <- sample(1:nrow(health), 0.8 * nrow(health)) 
+train_data <- health[split, ]  # Use the 80% selected for training
+test_data <- health[-split, ]  # Use the remaining for testing
+```
+
+### Appendix 6.2: Reprocessing Data
+```{r Reprocessing Data}
+# Separate predictors and response variables
+# Using training data
+x_train <- model.matrix(Admission.Type ~ ., data = train_data)[, -1] # Remove the intercept
+
+# Using test data
+x_test <- model.matrix(Admission.Type ~ ., data = test_data)[, -1] # Remove the intercept
+```
+
+### Appendix 6.3: Scale Predictors
+```{r Scale Predictors}
+# Standardising independent variables x
+x_train <- scale(x_train)
+x_test  <- scale(
+  x_test,
+  center = attr(x_train, "scaled:center"), # Mean of each column
+  scale  = attr(x_train, "scaled:scale") # Standard deviation of each column
+)
+
+# Defining admission type as the response variable y
+y_train <- train_data$Admission.Type
+y_test  <- test_data$Admission.Type
+
+# Converting training labels to categorical
+y_train_cat <- tf$keras$utils$to_categorical(as.integer(y_train) - 1) # -1 to ensure classes starts at 0
+
+# Converting test labels to categorical
+y_test_cat <- tf$keras$utils$to_categorical(as.integer(y_test) - 1) # -1 to ensure classes starts at 0
+
+num_classes <- ncol(y_train_cat) # Gives the number of unique classes
+```
+
+### Appendix 6.4: Define Neural Network
+```{r Define Neural Network}
+model <- keras_model_sequential() %>%
+  # Add first layer
+  layer_dense(units = 32, activation = "relu") %>%
+  
+  # Dropout after the first layer to prevent overfitting (drop 30% of neurons)
+  layer_dropout(rate = 0.3) %>%
+  
+  # Add second layer
+  layer_dense(units = 16, activation = "relu") %>%
+  
+  # Dropout after second layer to prevent overfitting in deeper layers (drop 30% of neurons)
+  layer_dropout(rate = 0.3) %>%
+  
+  # Output layer (final classification layer)
+  layer_dense(units = num_classes, activation = "softmax")
+```
+
+### Appendix 6.7: Compile And Train Model
+```{r Compile And Train Model}
+# Compile model
+model %>% compile(
+  optimizer = optimizer_adam(learning_rate = 0.001), # Use Adam optimiser to adapt learning rates automatically for faster and stable training
+  loss = "categorical_crossentropy", # Measures the difference between predicted probabilities and true labels
+  metrics = "accuracy" # Tracks accuracy
+)
+
+# Train model
+history <- model %>% fit(
+  x_train, y_train_cat,
+  validation_split = 0.2, # Reserve 20% of training data for validation to monitor overfitting
+  epochs = 50, # Number of full passes throung the training data
+  batch_size = 32 # Number of samples processed before updating the weights
+)
+```
+Analysis (Accuracy plot - Top):
+- Training accuracy hovers around 33% to 35%
+- Validation accuracy is similar to training accuracy but is slightly lower with both curves being mostly flat and only have a slight upward drift
+- Hence, model is not overfitting as training and validation accuracy are very close
+- Shows that the model is not much better than random guessing (3 classes of admission types, so about 33.3% if randomly guess)
+- So, neural network is not learning meaningful patterns
+
+Analysis (Loss plot - Bottom):
+- Training loss drops sharply initially then slowly decreases
+- Validation loss stays almost the same at around 1.1
+- Other than the initial gap, most of the gap between the training and validation loss is small
+- This indicates that initial learning does happen, but the model quickly levels
+- Though since there is no divergence between the training and validation loss, there unlikely to have any overfitting
+
+### Appendix 6.8: Evaluating Deep Learning Model On Test Data
+```{r Evaluating On Test Data}
+model %>% evaluate(x_test, y_test_cat)
+
+log(3)
+```
+Analysis: 
+- Neural network shows an accuracy of about 33.5%, which means it correctly predicts about 33.5% of cases in the test set (close to random guessing)
+- For the 3 classes, a completely random guess would give loss of 1.099, which is about log(3). This indicates that the model is not learning useful patterns from the data
+
+#### Appendix 5.6.9: Prediction And Evaluation
+```{r Deep Learning: Prediction and Evaluation}
+# Predict probabilities
+pred_prob <- model %>% predict(x_test)
+
+# Convert probabilities into class indices starting at 0
+pred_class <- apply(pred_prob, 1, which.max) - 1
+
+# Convert indices to factors
+pred_class <- factor(
+  levels(y_test)[pred_class + 1],
+  levels = levels(y_test)
+)
+
+# Overall evaluation
+confusionMatrix(pred_class, y_test)
+```
+Analysis:
+- Overall accuracy is about 33.5%
+- Kappa gives 0.0092, means that neural network is not any better than random guessing
+- Though model does predict emergency more often as it is more sensitive, but precision of guessing is low, which may lead to misclassifications
